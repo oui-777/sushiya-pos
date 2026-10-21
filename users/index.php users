@@ -1,0 +1,205 @@
+<?php
+require_once '../auth.php';
+require_admin();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+$error = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+    $valid_roles = ['admin', 'cashier'];
+
+    try {
+        if ($action === 'add') {
+            $username = trim($_POST['username'] ?? '');
+            $plain = trim($_POST['password'] ?? '');
+            $role = $_POST['role'] ?? 'cashier';
+            if ($username === '' || strlen($plain) < 4 || !in_array($role, $valid_roles, true)) {
+                throw new RuntimeException("กรุณากรอกชื่อผู้ใช้ และรหัสผ่านอย่างน้อย 4 ตัวอักษร");
+            }
+            $stmt = $pdo->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
+            $stmt->execute([$username, password_hash($plain, PASSWORD_DEFAULT), $role]);
+        }
+        elseif ($action === 'edit_user') {
+            $edit_id = (int)($_POST['user_id'] ?? 0);
+            $edit_user = trim($_POST['username'] ?? '');
+            $edit_role = $_POST['role'] ?? 'cashier';
+            $edit_pass = trim($_POST['new_password'] ?? '');
+            if ($edit_user === '' || !in_array($edit_role, $valid_roles, true)) {
+                throw new RuntimeException("ข้อมูลไม่ถูกต้อง");
+            }
+            // กันแอดมินปรับสิทธิ์ตัวเองจนเข้าหน้าจัดการไม่ได้
+            if ($edit_id === (int)$_SESSION['user_id']) {
+                $edit_role = 'admin';
+            }
+            if ($edit_pass !== '') {
+                if (strlen($edit_pass) < 4) {
+                    throw new RuntimeException("รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร");
+                }
+                $stmt = $pdo->prepare("UPDATE users SET username=?, role=?, password=? WHERE user_id=?");
+                $stmt->execute([$edit_user, $edit_role, password_hash($edit_pass, PASSWORD_DEFAULT), $edit_id]);
+            } else {
+                $stmt = $pdo->prepare("UPDATE users SET username=?, role=? WHERE user_id=?");
+                $stmt->execute([$edit_user, $edit_role, $edit_id]);
+            }
+        }
+        elseif ($action === 'delete') {
+            $del_id = (int)($_POST['user_id'] ?? 0);
+            if ($del_id === (int)$_SESSION['user_id']) {
+                throw new RuntimeException("ไม่สามารถลบบัญชีที่กำลังใช้งานอยู่ได้");
+            }
+            $stmt = $pdo->prepare("DELETE FROM users WHERE user_id = ?");
+            $stmt->execute([$del_id]);
+        }
+        header("Location: index.php");
+        exit;
+    } catch (RuntimeException $e) {
+        $error = $e->getMessage();
+    } catch (PDOException $e) {
+        $error = "บันทึกไม่สำเร็จ: ชื่อผู้ใช้นี้อาจมีอยู่แล้ว";
+    }
+}
+
+$users = $pdo->query("SELECT user_id, username, role, created_at FROM users ORDER BY user_id ASC")->fetchAll();
+?>
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>จัดการผู้ใช้งานระบบ — SUSHIYA</title>
+    <!-- โหลดสคริปต์ Bootstrap เพื่อให้ Modal ป๊อปอัปทำงานได้ -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+<body>
+<?php include '../navbar.php'; ?>
+
+<div class="container pb-5">
+    <?php if ($error): ?>
+        <div class="alert alert-danger rounded-4 border-0 shadow-sm mb-4"><?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
+    <div class="row g-4">
+        <!-- ฝั่งซ้าย: ฟอร์มเพิ่มผู้ใช้ใหม่ -->
+        <div class="col-lg-4">
+            <div class="content-card p-4">
+                <h5 class="fw-bold mb-3">➕ เพิ่มพนักงานใหม่</h5>
+                <form method="POST">
+                    <input type="hidden" name="action" value="add">
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">ชื่อผู้ใช้งาน (Username)</label>
+                        <input type="text" name="username" class="form-control form-input-custom" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">รหัสผ่าน (จะถูกเข้ารหัสอัตโนมัติ)</label>
+                        <input type="password" name="password" class="form-control form-input-custom" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label small text-muted">สิทธิ์การใช้งาน (Role)</label>
+                        <select name="role" class="form-select form-input-custom">
+                            <option value="cashier">Cashier (พนักงานขาย)</option>
+                            <option value="admin">Admin (ผู้จัดการ)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-action-primary w-100 py-2">บันทึกข้อมูล</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ฝั่งขวา: ตารางรายชื่อและการจัดการ -->
+        <div class="col-lg-8">
+            <div class="content-card p-4">
+                <h5 class="fw-bold mb-4">👥 รายชื่อผู้ใช้งานในระบบ</h5>
+                
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead class="table-light text-muted small border-bottom">
+                            <tr>
+                                <th>รหัส</th>
+                                <th>Username</th>
+                                <th>Password</th>
+                                <th>สิทธิ์ (Role)</th>
+                                <th class="text-center">จัดการ (Actions)</th> 
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($users as $u): ?>
+                            <tr>
+                                <td class="text-muted small">#<?= $u['user_id'] ?></td>
+                                <td class="fw-semibold text-dark"><?= htmlspecialchars($u['username']) ?></td>
+                                <td>
+                                    <!-- กรอบซ่อนรหัสผ่าน Hash ไม่ให้ตารางยืด -->
+                                    <div class="text-muted bg-light rounded-2 px-2 py-1" style="font-size: 0.75rem; max-width: 130px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: monospace;">
+                                        ••••••••
+                                    </div>
+                                </td>
+                                <td>
+                                    <?php if ($u['role'] === 'admin'): ?>
+                                        <span class="badge bg-danger rounded-pill px-2 fw-normal small">Admin</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-secondary rounded-pill px-2 fw-normal small">Cashier</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-center">
+                                    <div class="d-flex justify-content-center align-items-center gap-2">
+                                        <!-- ปุ่มเปิด Modal แก้ไข -->
+                                        <button type="button" class="btn btn-dark rounded-3 px-3 d-flex align-items-center justify-content-center" style="height: 30px; font-size: 0.8rem;" data-bs-toggle="modal" data-bs-target="#editUserModal<?= $u['user_id'] ?>">แก้ไข</button>
+                                        
+                                        <!-- ปุ่มลบ -->
+                                        <?php if ($u['user_id'] != $_SESSION['user_id']): ?>
+                                        <form method="POST" class="m-0" onsubmit="return confirm('ยืนยันการลบผู้ใช้นี้?');">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>">
+                                            <button type="submit" class="btn btn-outline-danger bg-white rounded-3 px-3 d-flex align-items-center justify-content-center" style="height: 30px; font-size: 0.8rem;">ลบ</button>
+                                        </form>
+                                        <?php else: ?>
+                                            <div style="width: 51px;"></div>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <!-- Modal แก้ไขข้อมูลผู้ใช้ (ซ่อนอยู่ในนี้เพื่อให้ทำงานได้ปกติ) -->
+                                    <div class="modal fade text-start" id="editUserModal<?= $u['user_id'] ?>" tabindex="-1">
+                                        <div class="modal-dialog modal-sm modal-dialog-centered">
+                                            <div class="modal-content border-0 rounded-4 shadow">
+                                                <div class="modal-header border-0 pb-0">
+                                                    <h6 class="modal-title fw-bold">✏️ แก้ไขข้อมูลพนักงาน</h6>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body p-4 pt-3">
+                                                    <form method="POST">
+                                                        <input type="hidden" name="action" value="edit_user">
+                                                        <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>">
+                                                        
+                                                        <div class="mb-3">
+                                                            <label class="form-label small text-muted">ชื่อผู้ใช้งาน</label>
+                                                            <input type="text" name="username" class="form-control form-input-custom" value="<?= htmlspecialchars($u['username']) ?>" required>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label small text-muted">รหัสผ่านใหม่ (เว้นว่างไว้ถ้าไม่เปลี่ยน)</label>
+                                                            <input type="password" name="new_password" class="form-control form-input-custom" placeholder="รหัสผ่านใหม่">
+                                                        </div>
+                                                        <div class="mb-4">
+                                                            <label class="form-label small text-muted">สิทธิ์การใช้งาน</label>
+                                                            <select name="role" class="form-select form-input-custom">
+                                                                <option value="cashier" <?= $u['role'] === 'cashier' ? 'selected' : '' ?>>Cashier (พนักงานขาย)</option>
+                                                                <option value="admin" <?= $u['role'] === 'admin' ? 'selected' : '' ?>>Admin (ผู้จัดการ)</option>
+                                                            </select>
+                                                        </div>
+                                                        <button type="submit" class="btn btn-dark w-100 py-2 rounded-3">บันทึกการแก้ไข</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- จบส่วน Modal -->
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
