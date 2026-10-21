@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+.btn-check:checked + .btn {
+    background-color: #FFFFFF;
+    color: #1D1D1F !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+:root {
+    --bg-washi: #F7F6F2;      /* สีกระดาษสาญี่ปุ่น / Off-white สบายตา */
+    --card-white: #FFFFFF;
+    --ink-dark: #1D1D1F;      /* สีดำหมึกญี่ปุ่น Sumi */
+    --muted-gray: #86868B;    /* สีเทา */
+    --salmon-red: #D94E34;    /* สีส้มแซลมอน / แดงญี่ปุ่น */
+    --matcha-green: #3A6B4C;  /* สีเขียวมัทฉะ */
+}
+
+body {
+    background-color: var(--bg-washi);
+    color: var(--ink-dark);
+    font-family: 'Inter', 'Noto Sans Thai', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+.main-navbar {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.content-card {
+    background: var(--card-white);
+    border-radius: 20px;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    transition: all 0.2s ease;
+}
+
+.btn-action-primary {
+    background-color: var(--salmon-red);
+    color: #FFFFFF;
+    border-radius: 12px;
+    padding: 8px 18px;
+    font-weight: 500;
+    border: none;
+    transition: all 0.2s;
+}
+.btn-action-primary:hover {
+    background-color: #bd3e26;
+    color: #FFFFFF;
+    transform: translateY(-1px);
+}
+
+.form-input-custom {
+    background-color: #F2F2F7;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    padding: 10px 14px;
+}
+.form-input-custom:focus {
+    background-color: #FFFFFF;
+    border-color: var(--salmon-red);
+    box-shadow: 0 0 0 3px rgba(217, 78, 52, 0.15);
+    outline: none;
+}
+
+.menu-link {
+    color: var(--ink-dark);
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: all 0.15s;
+}
+.menu-link:hover {
+    background-color: rgba(217, 78, 52, 0.08);
+    color: var(--salmon-red);
+}
